@@ -77,22 +77,41 @@ _INNERTUBE_CLIENTS = [
      "ctx": {"clientName": "IOS", "clientVersion": "20.10.4",
              "deviceModel": "iPhone16,2", "hl": "en"},
      "ua": "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 17_5 like Mac OS X)"},
-    {"name": "TVHTML5_EMBED",
-     "ctx": {"clientName": "TVHTML5_SIMPLY_EMBEDDED_PLAYER", "clientVersion": "2.0", "hl": "en"},
-     "ua": "Mozilla/5.0 (SMART-TV; LINUX; Tizen 5.0)"},
+    {"name": "TV_EMBED",
+     "ctx": {"clientName": "TVHTML5_SIMPLY_EMBEDDED_PLAYER", "clientVersion": "2.0", "hl": "en",
+             "clientScreen": "EMBED"},
+     "extra": {"thirdParty": {"embedUrl": "https://www.youtube.com/"}},
+     "ua": "Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15"},
+    {"name": "WEB_EMBED",
+     "ctx": {"clientName": "WEB_EMBEDDED_PLAYER", "clientVersion": "1.20250310.01.00", "hl": "en",
+             "clientScreen": "EMBED"},
+     "extra": {"thirdParty": {"embedUrl": "https://www.youtube.com/"}},
+     "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"},
+    {"name": "MWEB",
+     "ctx": {"clientName": "MWEB", "clientVersion": "2.20250311.03.00", "hl": "en"},
+     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"},
 ]
 
 
-def _innertube_probe(video_id="dQw4w9WgXcQ"):
+def _player_call(client, video_id):
+    """One InnerTube /player call with a given client config."""
+    ctx = {"client": client["ctx"]}
+    ctx.update(client.get("extra", {}))
+    r = requests.post(
+        "https://www.youtube.com/youtubei/v1/player",
+        json={"context": ctx, "videoId": video_id,
+              "contentCheckOk": True, "racyCheckOk": True},
+        headers={"User-Agent": client["ua"]}, timeout=15)
+    r.raise_for_status()
+    return r
+
+
+def _innertube_probe(video_id="dQw4w9WgXcQ", clients=None):
     """Try each client; report playability, track kinds, and actual caption fetch."""
     out = []
-    for c in _INNERTUBE_CLIENTS:
+    for c in (clients or _INNERTUBE_CLIENTS):
         try:
-            ua = {"User-Agent": c["ua"]}
-            r = requests.post(
-                "https://www.youtube.com/youtubei/v1/player",
-                json={"context": {"client": c["ctx"]}, "videoId": video_id},
-                headers=ua, timeout=15)
+            r = _player_call(c, video_id)
             d = r.json()
             status = d.get("playabilityStatus", {}).get("status")
             tracks = (d.get("captions", {})
@@ -103,7 +122,8 @@ def _innertube_probe(video_id="dQw4w9WgXcQ"):
                      "tracks": [{"lang": t.get("languageCode"),
                                  "kind": t.get("kind", "manual")} for t in tracks]}
             if tracks:
-                cap = requests.get(tracks[0]["baseUrl"], headers=ua, timeout=15)
+                cap = requests.get(tracks[0]["baseUrl"],
+                                   headers={"User-Agent": c["ua"]}, timeout=15)
                 entry["caption_fetch"] = {"status": cap.status_code,
                                           "bytes": len(cap.content),
                                           "sample": cap.text[:80]}
@@ -123,11 +143,7 @@ def _innertube_transcript(video_id: str):
     for c in _INNERTUBE_CLIENTS:
         try:
             ua = {"User-Agent": c["ua"]}
-            r = requests.post(
-                "https://www.youtube.com/youtubei/v1/player",
-                json={"context": {"client": c["ctx"]}, "videoId": video_id},
-                headers=ua, timeout=15)
-            r.raise_for_status()
+            r = _player_call(c, video_id)
             tracks = (r.json().get("captions", {})
                       .get("playerCaptionsTracklistRenderer", {})
                       .get("captionTracks", []))
@@ -365,7 +381,7 @@ def index():
 @app.route("/api/health")
 def health():
     """Diagnostics: version + which transcript routes work from this server."""
-    info = {"version": "2.4", "ok": True}
+    info = {"version": "2.5", "ok": True}
     if request.args.get("probe"):
         vid = request.args.get("video", "dQw4w9WgXcQ")
         info["innertube"] = _innertube_probe(vid)
@@ -375,6 +391,16 @@ def health():
         except Exception as e:
             info["transcript_test"] = {"ok": False, "error": str(e)[:200]}
     return jsonify(info)
+
+
+@app.route("/api/probe", methods=["POST"])
+def custom_probe():
+    """Remote experimentation: probe custom InnerTube client configs without redeploying.
+    Body: {"video_id": "...", "clients": [{"name","ctx","ua","extra"?}]}"""
+    data = request.get_json(silent=True) or {}
+    vid = data.get("video_id", "dQw4w9WgXcQ")
+    clients = data.get("clients")
+    return jsonify(_innertube_probe(vid, clients))
 
 
 @app.route("/api/generate", methods=["POST"])
