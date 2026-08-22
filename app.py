@@ -51,10 +51,28 @@ def get_thumbnail(video_id: str):
     return None
 
 
+def _make_api():
+    """YouTubeTranscriptApi with optional proxy (set env vars on your host):
+       WEBSHARE_USER + WEBSHARE_PASS  -> Webshare rotating residential proxies
+       PROXY_URL                      -> any generic http/https proxy url"""
+    ws_user = os.environ.get("WEBSHARE_USER")
+    ws_pass = os.environ.get("WEBSHARE_PASS")
+    proxy_url = os.environ.get("PROXY_URL")
+    if ws_user and ws_pass:
+        from youtube_transcript_api.proxies import WebshareProxyConfig
+        return YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
+            proxy_username=ws_user, proxy_password=ws_pass))
+    if proxy_url:
+        from youtube_transcript_api.proxies import GenericProxyConfig
+        return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
+            http_url=proxy_url, https_url=proxy_url))
+    return YouTubeTranscriptApi()
+
+
 def get_transcript(video_id: str):
     """Return (list of {start, text}, language) or (None, error_message)."""
     try:
-        api = YouTubeTranscriptApi()
+        api = _make_api()
         try:
             fetched = api.fetch(video_id)
         except Exception:
