@@ -84,21 +84,30 @@ _INNERTUBE_CLIENTS = [
 
 
 def _innertube_probe(video_id="dQw4w9WgXcQ"):
-    """Try each client; return list of (client, playability, n_tracks, error)."""
+    """Try each client; report playability, track kinds, and actual caption fetch."""
     out = []
     for c in _INNERTUBE_CLIENTS:
         try:
+            ua = {"User-Agent": c["ua"]}
             r = requests.post(
                 "https://www.youtube.com/youtubei/v1/player",
                 json={"context": {"client": c["ctx"]}, "videoId": video_id},
-                headers={"User-Agent": c["ua"]}, timeout=15)
+                headers=ua, timeout=15)
             d = r.json()
             status = d.get("playabilityStatus", {}).get("status")
             tracks = (d.get("captions", {})
                       .get("playerCaptionsTracklistRenderer", {})
                       .get("captionTracks", []))
-            out.append({"client": c["name"], "http": r.status_code,
-                        "playability": status, "tracks": len(tracks)})
+            entry = {"client": c["name"], "http": r.status_code,
+                     "playability": status,
+                     "tracks": [{"lang": t.get("languageCode"),
+                                 "kind": t.get("kind", "manual")} for t in tracks]}
+            if tracks:
+                cap = requests.get(tracks[0]["baseUrl"], headers=ua, timeout=15)
+                entry["caption_fetch"] = {"status": cap.status_code,
+                                          "bytes": len(cap.content),
+                                          "sample": cap.text[:80]}
+            out.append(entry)
         except Exception as e:
             out.append({"client": c["name"], "error": f"{type(e).__name__}: {e}"[:120]})
     return out
@@ -356,11 +365,12 @@ def index():
 @app.route("/api/health")
 def health():
     """Diagnostics: version + which transcript routes work from this server."""
-    info = {"version": "2.3", "ok": True}
+    info = {"version": "2.4", "ok": True}
     if request.args.get("probe"):
-        info["innertube"] = _innertube_probe()
+        vid = request.args.get("video", "dQw4w9WgXcQ")
+        info["innertube"] = _innertube_probe(vid)
         try:
-            sn, lang = _innertube_transcript("dQw4w9WgXcQ")
+            sn, lang = _innertube_transcript(vid)
             info["transcript_test"] = {"ok": True, "segments": len(sn), "lang": lang}
         except Exception as e:
             info["transcript_test"] = {"ok": False, "error": str(e)[:200]}
