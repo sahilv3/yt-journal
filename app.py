@@ -69,6 +69,51 @@ def _make_api():
     return YouTubeTranscriptApi()
 
 
+def _innertube_transcript(video_id: str):
+    """Fallback: fetch captions via YouTube's InnerTube API (ANDROID client).
+    Works from many cloud IPs where watch-page scraping is blocked."""
+    import html
+    import xml.etree.ElementTree as ET
+
+    ua = {"User-Agent": "com.google.android.youtube/20.10.38 (Linux; U; Android 11)"}
+    r = requests.post(
+        "https://www.youtube.com/youtubei/v1/player",
+        json={"context": {"client": {"clientName": "ANDROID", "clientVersion": "20.10.38",
+                                     "androidSdkVersion": 30, "hl": "en"}},
+              "videoId": video_id},
+        headers=ua, timeout=15)
+    r.raise_for_status()
+    tracks = (r.json().get("captions", {})
+              .get("playerCaptionsTracklistRenderer", {})
+              .get("captionTracks", []))
+    if not tracks:
+        raise RuntimeError("No caption tracks found")
+
+    def score(t):
+        s = 0
+        if t.get("languageCode", "").startswith("en"):
+            s -= 2                      # prefer English
+        if t.get("kind") != "asr":
+            s -= 1                      # prefer manual over auto-generated
+        return s
+    track = sorted(tracks, key=score)[0]
+
+    cap = requests.get(track["baseUrl"], headers=ua, timeout=15)
+    cap.raise_for_status()
+    root = ET.fromstring(cap.text)
+    snippets = []
+    for p in root.iter("p"):
+        start = float(p.get("t", 0)) / 1000.0
+        text = html.unescape("".join(p.itertext())).replace("\n", " ").strip()
+        if text:
+            snippets.append({"start": start, "text": text})
+    if not snippets:
+        raise RuntimeError("Caption track was empty")
+    lang = track.get("name", {}).get("runs", [{}])[0].get("text") \
+        or track.get("languageCode", "unknown")
+    return snippets, lang
+
+
 def get_transcript(video_id: str):
     """Return (list of {start, text}, language) or (None, error_message)."""
     try:
@@ -89,8 +134,12 @@ def get_transcript(video_id: str):
         snippets = [{"start": s.start, "text": s.text.replace("\n", " ").strip()}
                     for s in fetched.snippets]
         return snippets, fetched.language
-    except Exception as e:
-        return None, f"{type(e).__name__}: {e}"
+    except Exception as primary_err:
+        # Fallback: InnerTube API (works from many blocked/cloud IPs, no proxy needed)
+        try:
+            return _innertube_transcript(video_id)
+        except Exception:
+            return None, f"{type(primary_err).__name__}: {primary_err}"
 
 
 def fmt_ts(seconds: float):
