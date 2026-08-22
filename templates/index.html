@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT✦JOURNAL — chrome edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07070d; --txt:#eef0f8; --dim:#8a8fa8;
+  --holo:linear-gradient(100deg,#ff6ec4 0%,#a78bfa 25%,#4adede 50%,#fffb96 75%,#ff6ec4 100%);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'Space Grotesk',sans-serif;
+  overflow-x:hidden;cursor:none}
+::selection{background:#ff6ec4;color:#000}
+
+/* ---------- cursor ---------- */
+#cursor{position:fixed;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.75);pointer-events:none;z-index:9999;
+  transform:translate(-50%,-50%);transition:width .2s,height .2s,background .2s;
+  mix-blend-mode:difference}
+#cursor.hover{width:64px;height:64px;background:#fff}
+#cursor-dot{position:fixed;width:5px;height:5px;border-radius:50%;background:#fff;
+  transform:translate(-50%,-50%);pointer-events:none;z-index:9999;mix-blend-mode:difference}
+
+/* ---------- preloader ---------- */
+#preloader{position:fixed;inset:0;background:#07070d;z-index:1000;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:26px;
+  transition:opacity .9s,visibility .9s}
+#preloader.done{opacity:0;visibility:hidden}
+#pre-star{font-size:54px;animation:spinStar 2.4s linear infinite;
+  background:var(--holo);background-size:300% 300%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:spinStar 3s linear infinite, holoShift 3s linear infinite}
+@keyframes spinStar{to{transform:rotate(360deg)}}
+@keyframes holoShift{to{background-position:300% 0}}
+#pre-num{font-family:'Unbounded';font-weight:900;font-size:clamp(60px,10vw,120px);
+  background:linear-gradient(180deg,#fff 0%,#cdd4e6 38%,#5d6480 50%,#e9edf8 62%,#fff 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+#pre-label{font-size:11px;letter-spacing:.6em;color:var(--dim);text-transform:uppercase}
+
+/* ---------- 3D ---------- */
+#scene{position:fixed;inset:0;z-index:0}
+#grain{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ---------- chrome + holo text helpers ---------- */
+.chrome-txt{background:linear-gradient(180deg,#ffffff 0%,#c9d1e6 35%,#525a75 50%,#e6ebf7 63%,#ffffff 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.holo-txt{background:var(--holo);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:holoShift 6s linear infinite}
+
+main{position:relative;z-index:3}
+section{min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:100px 24px}
+
+/* ---------- nav ---------- */
+nav{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;
+  justify-content:space-between;align-items:center;padding:20px 34px;
+  backdrop-filter:blur(8px);background:linear-gradient(180deg,rgba(7,7,13,.75),transparent)}
+.logo{font-family:'Unbounded';font-weight:900;font-size:16px;letter-spacing:.05em}
+.logo .star{display:inline-block;animation:spinStar 5s linear infinite}
+.nav-pill{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:var(--txt);
+  border:1px solid rgba(255,255,255,.25);border-radius:100px;padding:10px 22px;
+  background:rgba(255,255,255,.05);transition:.25s}
+.nav-pill:hover{background:#fff;color:#000}
+
+/* ---------- hero ---------- */
+.badge{display:inline-flex;align-items:center;gap:10px;font-size:11px;
+  letter-spacing:.4em;text-transform:uppercase;color:var(--txt);
+  border:1px solid rgba(255,255,255,.2);border-radius:100px;padding:10px 24px;
+  margin-bottom:34px;background:rgba(255,255,255,.04);backdrop-filter:blur(6px)}
+.badge .pulse{width:7px;height:7px;border-radius:50%;background:#4adede;
+  box-shadow:0 0 12px #4adede;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+h1{font-family:'Unbounded';font-weight:900;text-transform:uppercase;text-align:center;
+  font-size:clamp(38px,7.4vw,96px);line-height:1.02}
+.sub{margin-top:28px;color:var(--dim);font-size:15px;text-align:center;max-width:600px;
+  line-height:1.9;font-weight:300}
+.sub b{color:var(--txt);font-weight:500}
+
+/* ---------- converter pod ---------- */
+#pod{margin-top:46px;width:min(720px,94vw);border-radius:26px;padding:1.5px;
+  background:var(--holo);background-size:300% 100%;animation:holoShift 6s linear infinite;
+  box-shadow:0 30px 90px rgba(167,139,250,.18)}
+#pod-inner{border-radius:25px;background:rgba(10,10,18,.92);backdrop-filter:blur(14px);
+  padding:30px 30px 24px}
+.pod-label{font-size:10px;letter-spacing:.45em;text-transform:uppercase;color:var(--dim);
+  margin-bottom:16px;display:flex;justify-content:space-between}
+.pod-row{display:flex;gap:12px;flex-wrap:wrap}
+#url{flex:1;min-width:240px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
+  border-radius:100px;outline:none;color:#fff;font-family:'Space Grotesk';font-size:15px;
+  padding:16px 26px;cursor:none;transition:.25s}
+#url:focus{border-color:#a78bfa;box-shadow:0 0 0 4px rgba(167,139,250,.15)}
+#url::placeholder{color:#4d5268}
+#exec{border:none;border-radius:100px;padding:16px 34px;font-family:'Unbounded';
+  font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:none;
+  background:linear-gradient(180deg,#ffffff,#c9d1e6 40%,#8a93b0 50%,#e6ebf7 60%,#fff);
+  color:#0a0a14;transition:transform .2s, box-shadow .2s;position:relative}
+#exec:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 14px 40px rgba(255,255,255,.25)}
+#exec:disabled{opacity:.45}
+#status{margin-top:18px;font-size:13px;color:var(--dim);min-height:20px;letter-spacing:.04em}
+#status .ok{color:#4adede}#status .er{color:#ff6e9c}
+#status .steps span{display:inline-block;margin-right:14px;opacity:.4;transition:.3s}
+#status .steps span.on{opacity:1;color:#fff}
+#status .steps span.done{opacity:1;color:#4adede}
+
+.scroll-hint{margin-top:64px;font-size:10px;letter-spacing:.5em;color:var(--dim);
+  text-transform:uppercase;animation:hintFloat 2.4s ease-in-out infinite}
+@keyframes hintFloat{50%{transform:translateY(9px);opacity:.4}}
+
+/* ---------- marquee ---------- */
+.marquee{width:100vw;overflow:hidden;border-top:1px solid rgba(255,255,255,.12);
+  border-bottom:1px solid rgba(255,255,255,.12);padding:20px 0;position:relative;z-index:3;
+  background:rgba(255,255,255,.02);backdrop-filter:blur(4px)}
+.marquee-track{display:flex;gap:0;white-space:nowrap;animation:scrollX 22s linear infinite;width:max-content}
+.marquee span{font-family:'Unbounded';font-weight:700;font-size:20px;text-transform:uppercase;
+  letter-spacing:.08em;padding:0 26px}
+@keyframes scrollX{to{transform:translateX(-50%)}}
+
+/* ---------- cards ---------- */
+.sec-tag{font-size:11px;letter-spacing:.5em;text-transform:uppercase;margin-bottom:16px}
+h2{font-family:'Unbounded';font-weight:900;text-transform:uppercase;text-align:center;
+  font-size:clamp(28px,4.6vw,56px);margin-bottom:60px;line-height:1.06}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;
+  width:min(1100px,94vw)}
+.card{border-radius:24px;padding:1.2px;background:linear-gradient(160deg,rgba(255,255,255,.35),rgba(255,255,255,.06) 40%,rgba(255,255,255,.02));
+  transition:transform .3s}
+.card:hover{transform:translateY(-8px)}
+.card:hover .card-in{background:rgba(20,20,34,.9)}
+.card:hover .card-ic{animation:spinStar 1.2s linear infinite}
+.card-in{border-radius:23px;background:rgba(13,13,22,.88);padding:34px 28px;height:100%;
+  backdrop-filter:blur(8px);transition:.3s}
+.card-ic{font-size:30px;display:inline-block;margin-bottom:20px}
+.card h3{font-family:'Unbounded';font-size:14px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;margin-bottom:14px}
+.card p{font-size:13.5px;line-height:1.9;color:var(--dim);font-weight:300}
+
+/* ---------- anatomy ---------- */
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px;
+  width:min(1080px,94vw);perspective:1200px}
+.page-card{border-radius:20px;background:linear-gradient(165deg,#f4f6fc,#c9d1e2 55%,#eef1f9);
+  aspect-ratio:3/4;padding:24px;display:flex;flex-direction:column;color:#20233a;
+  transition:transform .35s;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.page-card:hover{transform:rotateX(6deg) rotateY(-6deg) translateY(-10px)}
+.page-card .ph{font-family:'Unbounded';font-size:9px;font-weight:700;letter-spacing:.3em;
+  text-transform:uppercase;margin-bottom:16px;
+  background:linear-gradient(90deg,#ff6ec4,#7873f5);-webkit-background-clip:text;background-clip:text;color:transparent}
+.page-card .bar{height:8px;border-radius:4px;background:#aeb6cd;margin-bottom:9px;opacity:.6}
+.page-card .bar.hl{background:linear-gradient(90deg,#ff6ec4,#7873f5);opacity:1}
+.page-card .thumb{height:34%;border-radius:12px;margin:12px 0;
+  background:linear-gradient(135deg,#20233a,#3a3f63);display:flex;align-items:center;
+  justify-content:center;color:#fff;font-size:26px}
+.page-card .foot{margin-top:auto;font-size:9px;letter-spacing:.22em;color:#7b829d;text-transform:uppercase}
+
+/* stats */
+.stats{display:flex;flex-wrap:wrap;gap:16px;margin-top:74px;justify-content:center}
+.stat{border:1px solid rgba(255,255,255,.14);border-radius:100px;padding:18px 38px;
+  display:flex;align-items:baseline;gap:12px;background:rgba(255,255,255,.03);backdrop-filter:blur(6px)}
+.stat b{font-family:'Unbounded';font-weight:900;font-size:26px}
+.stat span{font-size:10px;letter-spacing:.25em;color:var(--dim);text-transform:uppercase}
+
+footer{position:relative;z-index:3;padding:60px 24px 40px;text-align:center;
+  border-top:1px solid rgba(255,255,255,.1)}
+footer .big{font-family:'Unbounded';font-weight:900;font-size:clamp(30px,6vw,72px);
+  text-transform:uppercase;margin-bottom:26px}
+footer .small{font-size:10px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase}
+
+.rv{opacity:0;transform:translateY(50px);transition:opacity 1s cubic-bezier(.2,.7,.2,1),transform 1s cubic-bezier(.2,.7,.2,1)}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:640px){body{cursor:auto}#cursor,#cursor-dot{display:none}}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div><div id="cursor-dot"></div>
+
+<div id="preloader">
+  <div id="pre-star">✦</div>
+  <div id="pre-num" class="chrome-txt">00</div>
+  <div id="pre-label">polishing the chrome</div>
+</div>
+
+<canvas id="scene"></canvas>
+<div id="grain"></div>
+
+<nav>
+  <div class="logo"><span class="star holo-txt">✦</span> <span class="chrome-txt">YT JOURNAL</span></div>
+  <a class="nav-pill" href="#pod" style="cursor:none">Start converting</a>
+</nav>
+
+<main>
+  <!-- HERO -->
+  <section>
+    <div class="badge rv"><span class="pulse"></span> video → pdf engine · v3.0 chrome</div>
+    <h1 class="rv">
+      <span class="chrome-txt">TURN VIDEOS</span><br>
+      <span class="holo-txt">INTO JOURNALS</span>
+    </h1>
+    <p class="sub rv">Drop any <b>YouTube link</b> below. We liquify it into a print-ready
+      <b>PDF journal</b> — chrome-plated cover, full <b>timestamped transcript</b>, and a notes
+      page for your analog thoughts. <b>✦ Free forever.</b></p>
+
+    <div id="pod" class="rv">
+      <div id="pod-inner">
+        <div class="pod-label"><span>input // youtube_url</span><span>✦ secure · zero retention</span></div>
+        <form class="pod-row" id="form">
+          <input id="url" type="url" required placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
+          <button id="exec" type="submit">Liquify ✦</button>
+        </form>
+        <div id="status"></div>
+      </div>
+    </div>
+
+    <div class="scroll-hint">✦ scroll for the shiny details ✦</div>
+  </section>
+
+  <!-- MARQUEE -->
+  <div class="marquee">
+    <div class="marquee-track" id="mtrack">
+      <span class="chrome-txt">ANY VIDEO ✦</span><span class="holo-txt">ONE JOURNAL ✦</span>
+      <span class="chrome-txt">TIMESTAMPED ✦</span><span class="holo-txt">PRINT READY ✦</span>
+      <span class="chrome-txt">FREE FOREVER ✦</span><span class="holo-txt">ZERO RETENTION ✦</span>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section>
+    <div class="sec-tag holo-txt rv">✦ what the machine does</div>
+    <h2 class="rv"><span class="chrome-txt">LIQUID</span> <span class="holo-txt">FEATURES</span></h2>
+    <div class="grid3">
+      <div class="card rv"><div class="card-in">
+        <span class="card-ic holo-txt">✦</span>
+        <h3 class="chrome-txt">Metadata Mining</h3>
+        <p>Any URL shape — watch, shorts, youtu.be. We extract the title, channel and HD thumbnail before you can blink twice.</p>
+      </div></div>
+      <div class="card rv"><div class="card-in">
+        <span class="card-ic holo-txt">❋</span>
+        <h3 class="chrome-txt">Transcript Melt</h3>
+        <p>The full caption track — auto-generated or human-made, any language — poured into clean 60-second reading blocks.</p>
+      </div></div>
+      <div class="card rv"><div class="card-in">
+        <span class="card-ic holo-txt">✧</span>
+        <h3 class="chrome-txt">Clickable Time</h3>
+        <p>Every timestamp in the PDF is a live link. Tap [04:20] on paper-turned-pixels and the video opens right there.</p>
+      </div></div>
+      <div class="card rv"><div class="card-in">
+        <span class="card-ic holo-txt">✺</span>
+        <h3 class="chrome-txt">Instant Forge</h3>
+        <p>A4 typesetting, unicode-safe fonts, cover art embedded. Compiled in memory and streamed to you in ~3 seconds.</p>
+      </div></div>
+      <div class="card rv"><div class="card-in">
+        <span class="card-ic holo-txt">✎</span>
+        <h3 class="chrome-txt">Analog Notes</h3>
+        <p>A ruled notes page at the end — because the best ideas still happen with a pen. Students & researchers, rejoice.</p>
+      </div></div>
+      <div class="card rv"><div class="card-in">
+        <span class="card-ic holo-txt">◌</span>
+        <h3 class="chrome-txt">Ghost Mode</h3>
+        <p>Nothing stored, no accounts, no cookies, no tracking. The engine forgets you the moment your download starts.</p>
+      </div></div>
+    </div>
+    <div class="stats rv">
+      <div class="stat"><b class="holo-txt" data-count="3">0</b><span>sec compile</span></div>
+      <div class="stat"><b class="holo-txt" data-count="100">0</b><span>% free</span></div>
+      <div class="stat"><b class="holo-txt" data-count="0">0</b><span>data kept</span></div>
+      <div class="stat"><b class="holo-txt">∞</b><span>videos allowed</span></div>
+    </div>
+  </section>
+
+  <!-- ANATOMY -->
+  <section>
+    <div class="sec-tag holo-txt rv">✦ output specification</div>
+    <h2 class="rv"><span class="holo-txt">DOCUMENT</span> <span class="chrome-txt">ANATOMY</span></h2>
+    <div class="spec">
+      <div class="page-card rv">
+        <div class="ph">Page 01 — Cover</div>
+        <div class="bar hl" style="width:72%"></div>
+        <div class="bar" style="width:46%"></div>
+        <div class="thumb">▶</div>
+        <div class="bar" style="width:88%"></div>
+        <div class="bar" style="width:58%"></div>
+        <div class="foot">Title · Channel · Link · Date</div>
+      </div>
+      <div class="page-card rv">
+        <div class="ph">Page 02+ — Transcript</div>
+        <div class="bar hl" style="width:28%"></div>
+        <div class="bar" style="width:96%"></div>
+        <div class="bar" style="width:90%"></div>
+        <div class="bar" style="width:94%"></div>
+        <div class="bar hl" style="width:28%;margin-top:14px"></div>
+        <div class="bar" style="width:92%"></div>
+        <div class="bar" style="width:86%"></div>
+        <div class="foot">Timestamped · Deep-linked</div>
+      </div>
+      <div class="page-card rv">
+        <div class="ph">Page N — Notes</div>
+        <div class="bar" style="width:100%;margin-top:18px"></div>
+        <div class="bar" style="width:100%;margin-top:12px"></div>
+        <div class="bar" style="width:100%;margin-top:12px"></div>
+        <div class="bar" style="width:100%;margin-top:12px"></div>
+        <div class="bar" style="width:100%;margin-top:12px"></div>
+        <div class="foot">Ruled · For human input</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="big"><span class="chrome-txt">STAY</span> <span class="holo-txt">SHINY ✦</span></div>
+  <div class="small">YT✦JOURNAL — CHROME EDITION · NO COOKIES · NO TRACKING · EST. 2026</div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+/* ---------- preloader ---------- */
+const pre=document.getElementById('preloader'),num=document.getElementById('pre-num');
+let lp=0;const li=setInterval(()=>{lp+=Math.random()*8+3;
+  if(lp>=100){lp=100;clearInterval(li);setTimeout(()=>pre.classList.add('done'),400);}
+  num.textContent=String(Math.floor(lp)).padStart(2,'0');},80);
+
+/* ---------- cursor ---------- */
+const cur=document.getElementById('cursor'),dot=document.getElementById('cursor-dot');
+let mx=innerWidth/2,my=innerHeight/2,cx=mx,cy=my;
+addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;
+  dot.style.left=mx+'px';dot.style.top=my+'px';});
+(function l(){cx+=(mx-cx)*.16;cy+=(my-cy)*.16;
+  cur.style.left=cx+'px';cur.style.top=cy+'px';requestAnimationFrame(l);})();
+document.querySelectorAll('button,input,a,.card,.page-card,.stat').forEach(el=>{
+  el.addEventListener('mouseenter',()=>cur.classList.add('hover'));
+  el.addEventListener('mouseleave',()=>cur.classList.remove('hover'));});
+
+/* ---------- reveal ---------- */
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.12});
+document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+
+/* ---------- counters ---------- */
+const cio=new IntersectionObserver(es=>es.forEach(e=>{
+  if(!e.isIntersecting)return;cio.unobserve(e.target);
+  const el=e.target,t=+el.dataset.count;let v=0;
+  const s=Math.max(1,Math.ceil(t/40));
+  const iv=setInterval(()=>{v+=s;if(v>=t){v=t;clearInterval(iv);}el.textContent=v;},30);
+}),{threshold:.5});
+document.querySelectorAll('[data-count]').forEach(el=>cio.observe(el));
+
+/* duplicate marquee for seamless loop */
+const mt=document.getElementById('mtrack');mt.innerHTML+=mt.innerHTML;
+
+/* ================= THREE.JS — liquid chrome ================= */
+const canvas=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,100);
+camera.position.set(0,0,9);
+
+/* iridescent environment map generated on a canvas */
+const ec=document.createElement('canvas');ec.width=1024;ec.height=512;
+const ectx=ec.getContext('2d');
+const g=ectx.createLinearGradient(0,0,1024,512);
+g.addColorStop(0,'#ff6ec4');g.addColorStop(.2,'#7873f5');g.addColorStop(.4,'#0b0b14');
+g.addColorStop(.55,'#4adede');g.addColorStop(.72,'#fffb96');g.addColorStop(.88,'#0b0b14');
+g.addColorStop(1,'#ff6ec4');
+ectx.fillStyle=g;ectx.fillRect(0,0,1024,512);
+/* bright bands for chrome highlights */
+ectx.fillStyle='rgba(255,255,255,.95)';
+ectx.fillRect(0,60,1024,34);ectx.fillRect(0,300,1024,20);ectx.fillRect(0,430,1024,44);
+const envTex=new THREE.CanvasTexture(ec);
+envTex.mapping=THREE.EquirectangularReflectionMapping;
+envTex.colorSpace=THREE.SRGBColorSpace;
+scene.environment=envTex;
+
+const chromeMat=new THREE.MeshStandardMaterial({metalness:1,roughness:.08,envMapIntensity:1.6,color:0xffffff});
+
+/* hero: liquid chrome torus knot */
+const knot=new THREE.Mesh(new THREE.TorusKnotGeometry(1.7,.52,240,36),chromeMat);
+knot.position.set(0,.4,0);scene.add(knot);
+
+/* floating chrome orbs */
+const orbs=[];
+for(let i=0;i<9;i++){
+  const r=.14+Math.random()*.36;
+  const o=new THREE.Mesh(new THREE.SphereGeometry(r,40,40),chromeMat);
+  o.userData={r0:3+Math.random()*4.5,sp:.1+Math.random()*.3,ph:Math.random()*Math.PI*2,
+    yA:1+Math.random()*2.4,yS:.3+Math.random()*.6};
+  scene.add(o);orbs.push(o);
+}
+/* a couple of chrome Y2K stars (octahedrons stretched) */
+const stars=[];
+for(let i=0;i<4;i++){
+  const s=new THREE.Mesh(new THREE.OctahedronGeometry(.42,0),chromeMat);
+  s.scale.y=1.9;
+  s.userData={r0:4+Math.random()*3.4,sp:.14+Math.random()*.2,ph:Math.random()*Math.PI*2};
+  scene.add(s);stars.push(s);
+}
+scene.add(new THREE.AmbientLight(0xffffff,.4));
+const dl=new THREE.DirectionalLight(0xffffff,1.6);dl.position.set(4,6,6);scene.add(dl);
+
+let tmx=0,tmy=0;
+addEventListener('mousemove',e=>{tmx=(e.clientX/innerWidth-.5)*2;tmy=(e.clientY/innerHeight-.5)*2;});
+
+const clk=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clk.getElapsedTime();
+  knot.rotation.x=t*.24;knot.rotation.y=t*.34;
+  knot.position.y=.4+Math.sin(t*.9)*.22;
+  const sf=Math.max(.25,1-scrollY/(innerHeight*1.1));
+  knot.scale.setScalar(sf);
+  orbs.forEach((o,i)=>{const u=o.userData;
+    const a=t*u.sp+u.ph;
+    o.position.set(Math.cos(a)*u.r0,Math.sin(t*u.yS+u.ph)*u.yA,Math.sin(a)*u.r0-1.5);
+    o.rotation.y=t*.5;});
+  stars.forEach(s=>{const u=s.userData;const a=t*u.sp+u.ph;
+    s.position.set(Math.cos(a)*u.r0,Math.sin(a*1.4)*2.2,Math.sin(a)*u.r0-2);
+    s.rotation.z=t*.8;s.rotation.y=t*.5;});
+  camera.position.x+=(tmx*1.3-camera.position.x)*.045;
+  camera.position.y+=(-tmy*.9-camera.position.y)*.045;
+  camera.lookAt(0,.2,0);
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+/* ================= generation flow ================= */
+const form=document.getElementById('form'),exec=document.getElementById('exec'),
+  status=document.getElementById('status');
+const STEPS=['probing','thumbnail','transcript','compiling'];
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const url=document.getElementById('url').value.trim();
+  exec.disabled=true;
+  status.innerHTML='<span class="steps">'+STEPS.map(s=>'<span>✦ '+s+'</span>').join('')+'</span>';
+  const chips=status.querySelectorAll('.steps span');
+  let si=0;const tick=setInterval(()=>{
+    if(si>0)chips[si-1].classList.replace('on','done');
+    if(si<chips.length){chips[si].classList.add('on');si++;}
+  },500);
+  try{
+    const res=await fetch('/api/generate',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    clearInterval(tick);chips.forEach(c=>{c.classList.remove('on');c.classList.add('done');});
+    if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.error||'generation failed');}
+    const blob=await res.blob();
+    const cd=res.headers.get('Content-Disposition')||'';
+    const m=cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+    const fn=m?decodeURIComponent(m[1].replace(/"/g,'')):'video-journal.pdf';
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;
+    document.body.appendChild(a);a.click();a.remove();
+    status.innerHTML='<span class="ok">✦ liquified — '+fn+' ('+(blob.size/1024).toFixed(1)+' KB) downloading…</span>';
+  }catch(err){clearInterval(tick);
+    status.innerHTML='<span class="er">✦ oops: '+err.message+'</span>';
+  }finally{exec.disabled=false;}
+});
+</script>
+</body>
+</html>

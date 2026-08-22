@@ -1,0 +1,7 @@
+# local artifacts — not needed in repo
+*.png
+*.pdf
+*.zip
+__pycache__/
+*.pyc
+.venv/
