@@ -69,49 +69,90 @@ def _make_api():
     return YouTubeTranscriptApi()
 
 
+_INNERTUBE_CLIENTS = [
+    {"name": "ANDROID",
+     "ctx": {"clientName": "ANDROID", "clientVersion": "20.10.38", "androidSdkVersion": 30, "hl": "en"},
+     "ua": "com.google.android.youtube/20.10.38 (Linux; U; Android 11)"},
+    {"name": "IOS",
+     "ctx": {"clientName": "IOS", "clientVersion": "20.10.4",
+             "deviceModel": "iPhone16,2", "hl": "en"},
+     "ua": "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 17_5 like Mac OS X)"},
+    {"name": "TVHTML5_EMBED",
+     "ctx": {"clientName": "TVHTML5_SIMPLY_EMBEDDED_PLAYER", "clientVersion": "2.0", "hl": "en"},
+     "ua": "Mozilla/5.0 (SMART-TV; LINUX; Tizen 5.0)"},
+]
+
+
+def _innertube_probe(video_id="dQw4w9WgXcQ"):
+    """Try each client; return list of (client, playability, n_tracks, error)."""
+    out = []
+    for c in _INNERTUBE_CLIENTS:
+        try:
+            r = requests.post(
+                "https://www.youtube.com/youtubei/v1/player",
+                json={"context": {"client": c["ctx"]}, "videoId": video_id},
+                headers={"User-Agent": c["ua"]}, timeout=15)
+            d = r.json()
+            status = d.get("playabilityStatus", {}).get("status")
+            tracks = (d.get("captions", {})
+                      .get("playerCaptionsTracklistRenderer", {})
+                      .get("captionTracks", []))
+            out.append({"client": c["name"], "http": r.status_code,
+                        "playability": status, "tracks": len(tracks)})
+        except Exception as e:
+            out.append({"client": c["name"], "error": f"{type(e).__name__}: {e}"[:120]})
+    return out
+
+
 def _innertube_transcript(video_id: str):
-    """Fallback: fetch captions via YouTube's InnerTube API (ANDROID client).
+    """Fallback: fetch captions via YouTube's InnerTube API, trying several clients.
     Works from many cloud IPs where watch-page scraping is blocked."""
     import html
     import xml.etree.ElementTree as ET
 
-    ua = {"User-Agent": "com.google.android.youtube/20.10.38 (Linux; U; Android 11)"}
-    r = requests.post(
-        "https://www.youtube.com/youtubei/v1/player",
-        json={"context": {"client": {"clientName": "ANDROID", "clientVersion": "20.10.38",
-                                     "androidSdkVersion": 30, "hl": "en"}},
-              "videoId": video_id},
-        headers=ua, timeout=15)
-    r.raise_for_status()
-    tracks = (r.json().get("captions", {})
-              .get("playerCaptionsTracklistRenderer", {})
-              .get("captionTracks", []))
-    if not tracks:
-        raise RuntimeError("No caption tracks found")
+    last_err = RuntimeError("No caption tracks found")
+    for c in _INNERTUBE_CLIENTS:
+        try:
+            ua = {"User-Agent": c["ua"]}
+            r = requests.post(
+                "https://www.youtube.com/youtubei/v1/player",
+                json={"context": {"client": c["ctx"]}, "videoId": video_id},
+                headers=ua, timeout=15)
+            r.raise_for_status()
+            tracks = (r.json().get("captions", {})
+                      .get("playerCaptionsTracklistRenderer", {})
+                      .get("captionTracks", []))
+            if not tracks:
+                last_err = RuntimeError(f"{c['name']}: no caption tracks")
+                continue
 
-    def score(t):
-        s = 0
-        if t.get("languageCode", "").startswith("en"):
-            s -= 2                      # prefer English
-        if t.get("kind") != "asr":
-            s -= 1                      # prefer manual over auto-generated
-        return s
-    track = sorted(tracks, key=score)[0]
+            def score(t):
+                s = 0
+                if t.get("languageCode", "").startswith("en"):
+                    s -= 2                      # prefer English
+                if t.get("kind") != "asr":
+                    s -= 1                      # prefer manual over auto-generated
+                return s
+            track = sorted(tracks, key=score)[0]
 
-    cap = requests.get(track["baseUrl"], headers=ua, timeout=15)
-    cap.raise_for_status()
-    root = ET.fromstring(cap.text)
-    snippets = []
-    for p in root.iter("p"):
-        start = float(p.get("t", 0)) / 1000.0
-        text = html.unescape("".join(p.itertext())).replace("\n", " ").strip()
-        if text:
-            snippets.append({"start": start, "text": text})
-    if not snippets:
-        raise RuntimeError("Caption track was empty")
-    lang = track.get("name", {}).get("runs", [{}])[0].get("text") \
-        or track.get("languageCode", "unknown")
-    return snippets, lang
+            cap = requests.get(track["baseUrl"], headers=ua, timeout=15)
+            cap.raise_for_status()
+            root = ET.fromstring(cap.text)
+            snippets = []
+            for p in root.iter("p"):
+                start = float(p.get("t", 0)) / 1000.0
+                text = html.unescape("".join(p.itertext())).replace("\n", " ").strip()
+                if text:
+                    snippets.append({"start": start, "text": text})
+            if not snippets:
+                last_err = RuntimeError(f"{c['name']}: caption track empty")
+                continue
+            lang = track.get("name", {}).get("runs", [{}])[0].get("text") \
+                or track.get("languageCode", "unknown")
+            return snippets, lang
+        except Exception as e:
+            last_err = e
+    raise last_err
 
 
 def get_transcript(video_id: str):
@@ -310,6 +351,20 @@ def build_pdf(video_id, meta, thumb, snippets, lang, err):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/health")
+def health():
+    """Diagnostics: version + which transcript routes work from this server."""
+    info = {"version": "2.3", "ok": True}
+    if request.args.get("probe"):
+        info["innertube"] = _innertube_probe()
+        try:
+            sn, lang = _innertube_transcript("dQw4w9WgXcQ")
+            info["transcript_test"] = {"ok": True, "segments": len(sn), "lang": lang}
+        except Exception as e:
+            info["transcript_test"] = {"ok": False, "error": str(e)[:200]}
+    return jsonify(info)
 
 
 @app.route("/api/generate", methods=["POST"])
